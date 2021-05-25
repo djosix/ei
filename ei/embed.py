@@ -1,5 +1,5 @@
 '''
-Copyright (c) 2020 Yuankui Lee
+Copyright (c) 2021 Yuankui Lee
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ import traceback
 import inspect
 
 
-def embed(message=None, exit=False):
+def embed(message=None, exit=False, color='Neutral'):
     # import IPython when function is called
     from IPython import embed
     
@@ -40,7 +40,7 @@ def embed(message=None, exit=False):
     user_ns = frame.f_locals
     user_module = inspect.getmodule(frame)
     
-    embed(header=message, user_ns=user_ns, user_module=user_module)
+    embed(header=message, user_ns=user_ns, user_module=user_module, colors=color)
     
     if exit:
         sys.exit()

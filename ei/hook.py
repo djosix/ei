@@ -1,5 +1,5 @@
 '''
-Copyright (c) 2020 Yuankui Lee
+Copyright (c) 2021 Yuankui Lee
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,33 +25,66 @@ import traceback
 
 
 class Hook:
-    def __init__(self, select=False, tb_class='AutoFormattedTB', tb_mode='Context', tb_color='Neutral'):
+    def __init__(self, select=True, verbose=False, color='Neutral'):
+        if color not in ('Linux', 'LightBG', 'Neutral'):
+            color = 'NoColor'
+
         self.select = select
-        self.tb_class = tb_class
-        self.tb_mode = tb_mode
-        self.tb_color = tb_color
+        self.verbose = verbose
+        self.color = color
+
+        if color in ('Linux', 'Neutral'):
+            self.color_index = '\033[33m'
+            self.color_prompt = '\033[33m'
+            self.color_reset = '\033[0m'
+        else:
+            self.color_index = ''
+            self.color_prompt = ''
+            self.color_reset = ''
+
+    def __create_tb_class(self):
+        from IPython.core.ultratb import AutoFormattedTB
+        
+        class TB(AutoFormattedTB):
+            def format_records(self_, *args):
+                frames = super().format_records(*args)
+                num_frames = len(frames)
+                for i in range(num_frames):
+                    r = num_frames - i - 1
+                    index = '{}({}){}'.format(self.color_prompt, i, self.color_reset)
+                    frames[r] = '{} {}'.format(index, frames[r])
+                return frames
+
+        return TB
     
     def __call__(self, exc_type, exc, tb):
         from IPython import embed
-        import IPython.core.ultratb
-        
-        TB = getattr(IPython.core.ultratb, self.tb_class)
-        tb_handler = TB(mode=self.tb_mode, color_scheme=self.tb_color)
+
+        TB = self.__create_tb_class()
+        tb_mode = ['Context', 'Verbose'][self.verbose]
+        tb_handler = TB(mode=tb_mode, color_scheme=self.color)
         tb_handler(exc_type, exc, tb)
         
         frames = [t[0] for t in traceback.walk_tb(tb)][::-1]
-        
+
+        def prompt(*args, **kwargs):
+            print(end=self.color_prompt)
+            print(*args, **kwargs)
+            print(end=self.color_reset, flush=kwargs.get('flush', False))
+
         while True:
             print()
             
             if self.select:
-                print('Select a stack frame to embed IPython shell (default: 0):')
-                for i, frame in enumerate(frames):
-                    print('{}. {}'.format(i, frame))
+                prompt('Select a stack frame (default: 0, ? for info): ', end='')
+                
                 try:
-                    s = input('> ').strip()
+                    s = input().strip()
                     if s in ('exit', 'quit', 'end', 'leave'):
                         break
+                    if s == '?':
+                        tb_handler(exc_type, exc, tb)
+                        continue
                     n = int(s) if s else 0
                     frame = frames[n]
                 except (KeyboardInterrupt, EOFError):
@@ -61,16 +94,22 @@ class Hook:
             else:
                 frame = frames[0]
 
-            print('Embedded into', frame)
+            prompt('Selected', frame)
             
             user_module = inspect.getmodule(frame)
             user_ns = frame.f_locals
+
+            default_ns = {
+                'exc': exc,
+                'tb': tb
+            }
             
-            user_ns.setdefault('etype', exc_type)
-            user_ns.setdefault('evalue', exc)
-            user_ns.setdefault('etb', tb)
+            for key, value in default_ns.items():
+                if key not in user_ns or value is user_ns[key]:
+                    prompt('{:>8s}: {!r}'.format(key, value))
+                    user_ns[key] = value
         
-            embed(banner1='', user_module=user_module, user_ns=user_ns, colors='Neutral')
+            embed(banner1='', user_module=user_module, user_ns=user_ns, colors=self.color)
             
             if not self.select:
                 break
