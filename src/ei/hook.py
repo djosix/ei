@@ -98,6 +98,7 @@ class Hook:
             
             user_module = inspect.getmodule(frame)
             user_ns = frame.f_locals
+            user_ns.setdefault('__name__', '__annoymous__') # fix IPython embed bug
 
             default_ns = {
                 'exc': exc,
@@ -108,6 +109,8 @@ class Hook:
                 if key not in user_ns or value is user_ns[key]:
                     prompt('{:>8s}: {!r}'.format(key, value))
                     user_ns[key] = value
+
+            print(user_ns)
         
             embed(banner1='', user_module=user_module, user_ns=user_ns, colors=self.color)
             
