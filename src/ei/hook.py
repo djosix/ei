@@ -20,6 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
+import sys
 import inspect
 import traceback
 
@@ -86,15 +87,15 @@ class Hook:
                         tb_handler(exc_type, exc, tb)
                         continue
                     n = int(s) if s else 0
-                    frame = frames[n]
                 except (KeyboardInterrupt, EOFError):
                     break
                 except:
                     continue
             else:
-                frame = frames[0]
+                n = 0
 
-            prompt('Selected', frame)
+            frame = frames[n]
+            prompt('Selected ({}) {}'.format(n, frame))
             
             user_module = inspect.getmodule(frame)
             user_ns = frame.f_locals
@@ -113,8 +114,6 @@ class Hook:
                     prompt('{:>8s}: {!r}'.format(key, value))
                     user_ns[key] = value
 
-            print(user_ns)
-        
             embed(banner1='', user_module=user_module, user_ns=user_ns, colors=self.color)
             
             if not self.select:
