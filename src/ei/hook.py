@@ -58,6 +58,11 @@ class Hook:
 
         return TB
     
+    def prompt(self, *args, **kwargs):
+        print(end=self.color_prompt)
+        print(*args, **kwargs)
+        print(end=self.color_reset, flush=kwargs.get('flush', False))
+
     def __call__(self, exc_type, exc, tb):
         from IPython import embed
 
@@ -68,53 +73,53 @@ class Hook:
         
         frames = [t[0] for t in traceback.walk_tb(tb)][::-1]
 
-        def prompt(*args, **kwargs):
-            print(end=self.color_prompt)
-            print(*args, **kwargs)
-            print(end=self.color_reset, flush=kwargs.get('flush', False))
-
         while True:
             print()
             
             if self.select:
-                prompt('Select a stack frame (default: 0, ? for info): ', end='')
+                self.prompt('Select a stack frame (q: quit, ?: info) [0]: ', end='')
                 
                 try:
-                    s = input().strip()
-                    if s in ('exit', 'quit', 'end', 'leave'):
+                    input_str = input().strip()
+
+                    if input_str == 'q':
                         break
-                    if s == '?':
+
+                    if input_str == '?':
                         tb_handler(exc_type, exc, tb)
                         continue
-                    n = int(s) if s else 0
+                    
+                    if input_str == '':
+                        n = 0
+                    elif not input_str.isdigit():
+                        self.prompt('[!] please input a nonnegative integer')
+                        continue
+                    else:
+                        n = int(input_str)
+                        if not n in range(len(frames)):
+                            self.prompt('[!] valid range is 0-{}'.format(len(frames) - 1))
+                            continue
+
                 except (KeyboardInterrupt, EOFError):
                     break
-                except:
-                    continue
             else:
                 n = 0
 
             frame = frames[n]
-            prompt('Selected ({}) {}'.format(n, frame))
+            self.prompt('Selected ({}) {}'.format(n, frame))
             
             user_module = inspect.getmodule(frame)
             user_ns = frame.f_locals
+            default_ns = {'exc': exc, 'tb': tb}
 
             if sys.version_info < (3, 7):
                 # fix error in warning for python<3.7
                 user_ns.setdefault('__name__', user_module.__name__)
 
-            default_ns = {
-                'exc': exc,
-                'tb': tb
-            }
-            
             for key, value in default_ns.items():
-                if key not in user_ns or value is user_ns[key]:
-                    prompt('{:>8s}: {!r}'.format(key, value))
-                    user_ns[key] = value
+                user_ns.setdefault(key, value)
 
             embed(banner1='', user_module=user_module, user_ns=user_ns, colors=self.color)
-            
+
             if not self.select:
                 break
