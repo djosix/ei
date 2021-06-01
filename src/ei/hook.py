@@ -98,7 +98,10 @@ class Hook:
             
             user_module = inspect.getmodule(frame)
             user_ns = frame.f_locals
-            user_ns.setdefault('__name__', '__annoymous__') # fix IPython embed bug
+
+            if sys.version_info < (3, 7):
+                # fix error in warning for python<3.7
+                user_ns.setdefault('__name__', user_module.__name__)
 
             default_ns = {
                 'exc': exc,
