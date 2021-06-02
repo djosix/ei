@@ -5,10 +5,11 @@ Automatically embed IPython into arbitrary stack frames in traceback.
 ## Install
 
 ```bash
-pip install ei
+# PyPI
+pip3 install ei
 
-# Or from GitHub
-pip install git+https://github.com.djosix/ei.git
+# GitHub
+pip3 install git+https://github.com.djosix/ei.git
 ```
 
 ## Usage
@@ -22,15 +23,16 @@ def main():
     return a / b
 
 if __name__ == '__main__':
-    import ei; ei.patch()
+    import ei
+    ei.patch() # overwrites sys.excepthook
 
     main()
 ```
 
-You can also unpatch:
+Unpatch to recover `sys.excepthook`:
 
 ```python
-ei.unpatch() # this will recover the exception hook
+ei.unpatch()
 ```
 
 Context manager:
@@ -39,5 +41,11 @@ Context manager:
 with ei.capture():
     main()
 
-# The exception hook is recovered
+# The exception hook is recovered here
+```
+
+Lazy patch:
+
+```python
+import ei.patched
 ```
