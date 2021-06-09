@@ -2,6 +2,8 @@
 
 Automatically embed IPython into arbitrary stack frames in traceback.
 
+[![asciicast](https://asciinema.org/a/jWSj75lwjHfxUmtkSyWRGN2Tx.svg)](https://asciinema.org/a/jWSj75lwjHfxUmtkSyWRGN2Tx)
+
 ## Install
 
 ```bash
