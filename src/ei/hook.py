@@ -52,7 +52,7 @@ class Hook:
                 num_frames = len(frames)
                 for i in range(num_frames):
                     r = num_frames - i - 1
-                    index = '{}({}){}'.format(self.color_prompt, i, self.color_reset)
+                    index = '{}({}){}'.format(self.color_index, i, self.color_reset)
                     frames[r] = '{} {}'.format(index, frames[r])
                 return frames
 
