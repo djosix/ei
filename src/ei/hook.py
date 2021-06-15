@@ -21,18 +21,29 @@ SOFTWARE.
 '''
 
 import sys
+import io
 import inspect
 import traceback
 
 
 class Hook:
-    def __init__(self, select=True, verbose=False, color='Neutral'):
-        if color not in ('Linux', 'LightBG', 'Neutral'):
+    COLOR_SCHEME_LIST = ('Linux', 'LightBG', 'Neutral')
+
+    def __init__(self, select=True, verbose=False, color='Neutral', ostream=sys.stdout):
+        
+        if not isinstance(ostream, io.TextIOBase):
+            raise TypeError('expect ostream to be a text io')
+        
+        if not ostream.writable():
+            raise ValueError('ostream is not writable')
+
+        if color not in self.COLOR_SCHEME_LIST or not ostream.isatty():
             color = 'NoColor'
 
         self.select = select
         self.verbose = verbose
         self.color = color
+        self.ostream = ostream
 
         if color in ('Linux', 'Neutral'):
             self.color_index = '\033[33m'
@@ -45,30 +56,33 @@ class Hook:
 
     def __create_tb_class(self):
         from IPython.core.ultratb import AutoFormattedTB
-        
+
         class TB(AutoFormattedTB):
             def format_records(self_, *args):
                 frames = super().format_records(*args)
                 num_frames = len(frames)
+
                 for i in range(num_frames):
                     r = num_frames - i - 1
                     index = '{}({}){}'.format(self.color_index, i, self.color_reset)
                     frames[r] = '{} {}'.format(index, frames[r])
+
                 return frames
 
         return TB
     
-    def prompt(self, *args, **kwargs):
-        print(end=self.color_prompt)
-        print(*args, **kwargs)
-        print(end=self.color_reset, flush=kwargs.get('flush', False))
+    def prompt(self, text):
+        self.ostream.write(self.color_prompt)
+        self.ostream.write(text)
+        self.ostream.write(self.color_reset)
+        self.ostream.flush()
 
     def __call__(self, exc_type, exc, tb):
         from IPython import embed
 
         TB = self.__create_tb_class()
         tb_mode = ['Context', 'Verbose'][self.verbose]
-        tb_handler = TB(mode=tb_mode, color_scheme=self.color)
+        tb_handler = TB(mode=tb_mode, color_scheme=self.color, ostream=self.ostream)
         tb_handler(exc_type, exc, tb)
         
         frames = [t[0] for t in traceback.walk_tb(tb)][::-1]
@@ -77,7 +91,7 @@ class Hook:
             print()
             
             if self.select:
-                self.prompt('Select a stack frame (q: quit, ?: info) [0]: ', end='')
+                self.prompt('Select a stack frame (q: quit, ?: info) [0]: ')
                 
                 try:
                     input_str = input().strip()
@@ -92,12 +106,12 @@ class Hook:
                     if input_str == '':
                         n = 0
                     elif not input_str.isdigit():
-                        self.prompt('[!] please input a nonnegative integer')
+                        self.prompt('[!] please input a nonnegative integer\n')
                         continue
                     else:
                         n = int(input_str)
                         if not n in range(len(frames)):
-                            self.prompt('[!] valid range is 0-{}'.format(len(frames) - 1))
+                            self.prompt('[!] valid range is 0-{}\n'.format(len(frames) - 1))
                             continue
 
                 except (KeyboardInterrupt, EOFError):
@@ -106,7 +120,7 @@ class Hook:
                 n = 0
 
             frame = frames[n]
-            self.prompt('Selected ({}) {}'.format(n, frame))
+            self.prompt('Selected ({}) {}\n'.format(n, frame))
             
             user_module = inspect.getmodule(frame)
             user_ns = frame.f_locals
