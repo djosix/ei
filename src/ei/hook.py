@@ -31,10 +31,17 @@ class Hook:
 
     def __init__(self, select=True, verbose=False, color='Neutral', ostream=sys.stdout):
         
-        if not isinstance(ostream, io.TextIOBase):
-            raise TypeError('expect ostream to be a text io')
+        try:
+            mode = ostream.mode
+            writable = ostream.writable()
+            ostream.write
+        except AttributeError:
+            raise TypeError('invalid type of ostream')
+
+        if 'b' in mode:
+            raise TypeError('expect ostream in text mode')
         
-        if not ostream.writable():
+        if not writable:
             raise ValueError('ostream is not writable')
 
         if color not in self.COLOR_SCHEME_LIST or not ostream.isatty():
