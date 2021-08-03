@@ -26,6 +26,8 @@ import inspect
 
 
 def embed(message=None, exit=False, color='Neutral'):
+    original_excepthook = sys.excepthook
+
     # import IPython when function is called
     from IPython import embed
 
@@ -48,3 +50,6 @@ def embed(message=None, exit=False, color='Neutral'):
     
     if exit:
         sys.exit()
+
+    # recover excepthook
+    sys.excepthook = original_excepthook
