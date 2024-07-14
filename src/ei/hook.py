@@ -21,7 +21,6 @@ SOFTWARE.
 '''
 
 import sys
-import io
 import inspect
 import traceback
 
@@ -30,7 +29,6 @@ class Hook:
     COLOR_SCHEME_LIST = ('Linux', 'LightBG', 'Neutral')
 
     def __init__(self, select=True, verbose=False, color='Neutral', ostream=sys.stdout):
-        
         try:
             mode = ostream.mode
             writable = ostream.writable()
@@ -40,7 +38,7 @@ class Hook:
 
         if 'b' in mode:
             raise TypeError('expect ostream in text mode')
-        
+
         if not writable:
             raise ValueError('ostream is not writable')
 
@@ -52,95 +50,84 @@ class Hook:
         self.color = color
         self.ostream = ostream
 
+        self.ansi_color = ''
+        self.ansi_reset = ''
         if color in ('Linux', 'Neutral'):
-            self.color_index = '\033[33m'
-            self.color_prompt = '\033[33m'
-            self.color_reset = '\033[0m'
-        else:
-            self.color_index = ''
-            self.color_prompt = ''
-            self.color_reset = ''
+            self.ansi_color = '\033[33m'
+            self.ansi_reset = '\033[0m'
 
-    def __create_tb_class(self):
-        from IPython.core.ultratb import AutoFormattedTB
-
-        class TB(AutoFormattedTB):
-            def format_records(self_, *args):
-                frames = super().format_records(*args)
-                num_frames = len(frames)
-
-                for i in range(num_frames):
-                    r = num_frames - i - 1
-                    index = '{}({}){}'.format(self.color_index, i, self.color_reset)
-                    frames[r] = '{} {}'.format(index, frames[r])
-
-                return frames
-
-        return TB
-    
-    def prompt(self, text):
-        self.ostream.write(self.color_prompt)
+    def __print(self, text):
+        self.ostream.write(self.ansi_color)
         self.ostream.write(text)
-        self.ostream.write(self.color_reset)
+        self.ostream.write(self.ansi_reset)
         self.ostream.flush()
 
-    def __call__(self, exc_type, exc, tb):
-        from IPython import embed
+    def __embed(self, frame, exc, tb):
+        user_module = inspect.getmodule(frame)
+        user_ns = frame.f_locals
+        default_ns = {'exc': exc, 'tb': tb}
 
-        TB = self.__create_tb_class()
-        tb_mode = ['Context', 'Verbose'][self.verbose]
-        tb_handler = TB(mode=tb_mode, color_scheme=self.color, ostream=self.ostream)
-        tb_handler(exc_type, exc, tb)
-        
-        frames = [t[0] for t in traceback.walk_tb(tb)][::-1]
+        if sys.version_info < (3, 7):
+            # fix error in warning for python<3.7
+            user_ns.setdefault('__name__', user_module.__name__)
+
+        for key, value in default_ns.items():
+            user_ns.setdefault(key, value)
+
+        from IPython import embed
+        embed(banner1='', user_module=user_module, user_ns=user_ns, colors=self.color)
+
+    def __call__(self, exc_type, exc, tb):
+        from IPython.core.ultratb import AutoFormattedTB
+        tb_handler = AutoFormattedTB(mode=['Context', 'Verbose'][self.verbose],
+                                     color_scheme=self.color,
+                                     ostream=self.ostream)
+
+        frames = [t[0] for t in traceback.walk_tb(tb)]
+        records = tb_handler.get_records(tb, 5, None)
+        assert len(frames) == len(records)
+
+        def print_frames():
+            for i, record in zip(reversed(range(len(records))), records):
+                self.ostream.write(self.ansi_color)
+                self.ostream.write('({}) '.format(i))
+                self.ostream.write(self.ansi_reset)
+                self.ostream.write(tb_handler.format_record(record))
+                self.ostream.write('\n')
+
+        print_frames()
+
+        if not self.select:
+            selection = 0
+            frame = frames[len(frames)-1-selection]
+            self.__print('Selected ({}) {}\n'.format(selection, frame))
+            self.__embed(frame, exc, tb)
+            return
 
         while True:
-            print()
-            
-            if self.select:
-                self.prompt('Select a stack frame (q: quit, ?: info) [0]: ')
-                
-                try:
-                    input_str = input().strip()
+            self.ostream.write('\n')
+            self.__print('Select a stack frame (q: quit, ?: info) [0]: ')
 
-                    if input_str == 'q':
-                        break
-
-                    if input_str == '?':
-                        tb_handler(exc_type, exc, tb)
+            try:
+                line = input().strip()
+                if line == 'q':
+                    return
+                elif line == '?':
+                    print_frames()
+                    continue
+                elif line == '':
+                    selection = 0
+                elif not line.isdigit():
+                    self.__print('[!] please input a nonnegative integer\n')
+                    continue
+                else:
+                    selection = int(line)
+                    if selection not in range(len(frames)):
+                        self.__print('[!] valid range is 0-{}\n'.format(len(frames) - 1))
                         continue
-                    
-                    if input_str == '':
-                        n = 0
-                    elif not input_str.isdigit():
-                        self.prompt('[!] please input a nonnegative integer\n')
-                        continue
-                    else:
-                        n = int(input_str)
-                        if not n in range(len(frames)):
-                            self.prompt('[!] valid range is 0-{}\n'.format(len(frames) - 1))
-                            continue
-
-                except (KeyboardInterrupt, EOFError):
-                    break
-            else:
-                n = 0
-
-            frame = frames[n]
-            self.prompt('Selected ({}) {}\n'.format(n, frame))
-            
-            user_module = inspect.getmodule(frame)
-            user_ns = frame.f_locals
-            default_ns = {'exc': exc, 'tb': tb}
-
-            if sys.version_info < (3, 7):
-                # fix error in warning for python<3.7
-                user_ns.setdefault('__name__', user_module.__name__)
-
-            for key, value in default_ns.items():
-                user_ns.setdefault(key, value)
-
-            embed(banner1='', user_module=user_module, user_ns=user_ns, colors=self.color)
-
-            if not self.select:
+            except (KeyboardInterrupt, EOFError):
                 break
+
+            frame = frames[len(frames)-selection-1]
+            self.__print('Selected ({}) {}\n'.format(selection, frame))
+            self.__embed(frame, exc, tb)
