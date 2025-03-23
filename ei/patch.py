@@ -1,5 +1,4 @@
-MIT License
-
+'''
 Copyright (c) 2025 Yuankui Lee
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,3 +18,31 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+'''
+
+import contextlib
+import sys
+
+from .hook import hook
+
+_original_excepthook = None
+
+
+def patch():
+    global _original_excepthook
+    _original_excepthook = sys.excepthook
+    sys.excepthook = hook
+
+
+def unpatch():
+    global _original_excepthook
+    assert _original_excepthook is not None, 'not patched'
+    sys.excepthook = _original_excepthook
+    _original_excepthook = None
+
+
+@contextlib.contextmanager
+def capture():
+    patch()
+    yield
+    unpatch()

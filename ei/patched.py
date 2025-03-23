@@ -1,5 +1,5 @@
 '''
-Copyright (c) 2021 Yuankui Lee
+Copyright (c) 2025 Yuankui Lee
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,6 +20,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-from .hook import Hook
-from .patch import patch, unpatch, capture
-from .embed import embed
+from .patch import patch
+
+patch()
