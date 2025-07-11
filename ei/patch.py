@@ -25,20 +25,23 @@ import sys
 
 from .hook import hook
 
-_original_excepthook = None
+
+class ExceptHook:
+    def __init__(self, current_hook, previous_hook):
+        self.current = current_hook
+        self.previous = previous_hook
+
+    def __call__(self, *args, **kwargs):
+        self.current(*args, **kwargs)
 
 
 def patch():
-    global _original_excepthook
-    _original_excepthook = sys.excepthook
-    sys.excepthook = hook
+    sys.excepthook = ExceptHook(hook, sys.excepthook)
 
 
 def unpatch():
-    global _original_excepthook
-    assert _original_excepthook is not None, 'not patched'
-    sys.excepthook = _original_excepthook
-    _original_excepthook = None
+    assert isinstance(sys.excepthook, ExceptHook), 'cannot restore previous excepthook'
+    sys.excepthook = sys.excepthook.previous
 
 
 @contextlib.contextmanager
